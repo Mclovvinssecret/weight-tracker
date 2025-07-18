@@ -238,8 +238,12 @@
       bmiSpan.innerText = bmi;
 
       const BMR = Math.round(10 * weight + 6.25 * height - 5 * age + 5);
-      const caloriesToBurn = 650;
-      caloriesSpan.innerText = `${caloriesToBurn} kcal/day`;
+const activityFactor = 1.5;
+const TDEE = Math.round(BMR * activityFactor);
+const dailyDeficit = 650;
+const dailyIntake = TDEE - dailyDeficit;
+
+caloriesSpan.innerText = `${dailyIntake} kcal/day`;
     }
 
     // ✅ Date-formatted chart rendering
