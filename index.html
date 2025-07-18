@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -54,21 +55,26 @@
     <label>Start Weight (kg): <input type="number" id="startWeight" /></label><br />
     <label>Goal Weight (kg): <input type="number" id="goalWeight" /></label><br />
     <button onclick="initializeUser()">Start Tracking</button>
-  </div>  <div id="tracker" style="display:none">
-    <label>Latest Weight (kg): <input type="number" id="latestWeight" /></label>
-    <button onclick="submitWeight()">Submit</button><canvas id="weightChart" width="400" height="200"></canvas>
-<div class="progress-bar"><div id="progressFill" class="progress-bar-fill"></div></div>
-
-<p><strong>Progress:</strong> <span id="progressText">0%</span></p>
-<p><strong>BMI:</strong> <span id="bmi"></span></p>
-<p><strong>Calories/day (TDEE):</strong> <span id="tdee"></span> kcal</p>
-<p><strong>Est. Burn Needed:</strong> 500 kcal/day</p>
-<p><strong>Est. Days to Goal:</strong> <span id="estDays"></span></p>
-<p><strong>Recommended Sleep:</strong> 8–10 hours</p>
-<p id="motivation"></p>
-
   </div>
-</div><script type="module">
+
+  <div id="tracker" style="display:none">
+    <label>Latest Weight (kg): <input type="number" id="latestWeight" /></label>
+    <button onclick="submitWeight()">Submit</button>
+
+    <canvas id="weightChart" width="400" height="200"></canvas>
+    <div class="progress-bar"><div id="progressFill" class="progress-bar-fill"></div></div>
+
+    <p><strong>Progress:</strong> <span id="progressText">0%</span></p>
+    <p><strong>BMI:</strong> <span id="bmi"></span></p>
+    <p><strong>Calories/day (TDEE):</strong> <span id="tdee"></span> kcal</p>
+    <p><strong>Est. Burn Needed:</strong> 500 kcal/day</p>
+    <p><strong>Est. Days to Goal:</strong> <span id="estDays"></span></p>
+    <p><strong>Recommended Sleep:</strong> 8–10 hours</p>
+    <p id="motivation"></p>
+  </div>
+</div>
+
+<script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, push, onValue, set, get, child } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -178,5 +184,6 @@
     const quote = quotes[Math.floor(Math.random() * quotes.length)];
     document.getElementById('motivation').textContent = `💬 ${quote}`;
   }
-</script></body>
+</script>
+</body>
 </html>
