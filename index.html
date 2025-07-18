@@ -68,48 +68,40 @@
   <div class="card" id="log"><h3>Entry Log</h3></div>
 
   <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+    import { getDatabase, ref, push, set, get, child } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 
-  <script>
-    // 🛠 Replace with your Firebase config
-    const firebaseConfig = // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+    // ✅ Your Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDCANiNTmv4bU7ayVyCD_Dwwf04QQ7XlVc",
+      authDomain: "weight-tracker-01.firebaseapp.com",
+      databaseURL: "https://weight-tracker-01-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "weight-tracker-01",
+      storageBucket: "weight-tracker-01.firebasestorage.app",
+      messagingSenderId: "560173087855",
+      appId: "1:560173087855:web:d6b591b55e6151ac7c619a",
+      measurementId: "G-E4MRDK2VZE"
+    };
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyDCANiNTmv4bU7ayVyCD_Dwwf04QQ7XlVc",
-  authDomain: "weight-tracker-01.firebaseapp.com",
-  databaseURL: "https://weight-tracker-01-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "weight-tracker-01",
-  storageBucket: "weight-tracker-01.firebasestorage.app",
-  messagingSenderId: "560173087855",
-  appId: "1:560173087855:web:d6b591b55e6151ac7c619a",
-  measurementId: "G-E4MRDK2VZE"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    const auth = firebase.auth();
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth();
 
     let uid = null;
     let entries = [];
 
-    auth.signInAnonymously().then(() => {
-      uid = auth.currentUser.uid;
-      loadEntries();
+    signInAnonymously(auth).then(() => {
+      onAuthStateChanged(auth, user => {
+        if (user) {
+          uid = user.uid;
+          loadEntries();
+        }
+      });
     });
 
-    function addEntry() {
+    window.addEntry = function () {
       const weight = parseFloat(document.getElementById("weight").value);
       const height = parseFloat(document.getElementById("height").value);
       const age = parseInt(document.getElementById("age").value);
@@ -127,7 +119,7 @@ const analytics = getAnalytics(app);
       const date = new Date().toISOString().split("T")[0];
       const entry = { date, weight, bmi, height, exercised, age, startWeight, goalWeight, activity };
 
-      db.ref("users/" + uid + "/entries").push(entry).then(() => {
+      push(ref(db, "users/" + uid + "/entries"), entry).then(() => {
         document.getElementById("weight").value = "";
         document.getElementById("exercise").checked = false;
         loadEntries();
@@ -135,13 +127,12 @@ const analytics = getAnalytics(app);
     }
 
     function loadEntries() {
-      db.ref("users/" + uid + "/entries").once("value").then(snapshot => {
-        const data = snapshot.val();
+      get(child(ref(db), "users/" + uid + "/entries")).then(snapshot => {
         const log = document.getElementById("log");
         log.innerHTML = "<h3>Entry Log</h3>";
+        if (!snapshot.exists()) return;
 
-        if (!data) return;
-
+        const data = snapshot.val();
         entries = Object.values(data).sort((a, b) => new Date(a.date) - new Date(b.date));
         entries.forEach(entry => {
           log.innerHTML += `
