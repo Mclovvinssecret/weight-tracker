@@ -242,6 +242,11 @@ const activityFactor = 1.5;
 const TDEE = Math.round(BMR * activityFactor);
 const dailyDeficit = 650;
 const dailyIntake = TDEE - dailyDeficit;
+const kcalPerKg = 7700;
+const weightLossNeeded = weight - goalWeight;
+const daysToGoal = Math.ceil((weightLossNeeded * kcalPerKg) / caloriesToBurn);
+
+document.getElementById('days').innerText = `${daysToGoal} days`;
 
 caloriesSpan.innerText = `${dailyDeficit} kcal/day`;
     }
