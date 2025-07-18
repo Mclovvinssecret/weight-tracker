@@ -3,22 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <title>Weight Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial; background: #f2f2f2; padding: 20px; }
-    .card { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    input, button { width: 100%; padding: 10px; margin-top: 10px; }
-    .entry { background: #f9f9f9; margin-top: 10px; padding: 10px; border-left: 4px solid #007bff; }
+    body { font-family: sans-serif; background: #f2f2f2; padding: 20px; }
+    .card { background: white; padding: 20px; margin: 10px auto; max-width: 600px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    input, select { width: 100%; padding: 8px; margin-top: 8px; margin-bottom: 12px; }
+    label { font-weight: bold; }
+    button { padding: 10px; width: 100%; background: #007bff; color: white; border: none; border-radius: 5px; }
+    button:hover { background: #0056b3; }
+    .progress { background: #ddd; height: 25px; border-radius: 20px; overflow: hidden; margin-top: 10px; }
+    .progress-bar { height: 100%; background: #28a745; text-align: center; color: white; line-height: 25px; }
+    canvas { margin-top: 20px; }
+    .entry { margin-top: 10px; background: #fafafa; border-left: 4px solid #007bff; padding: 10px; }
   </style>
 </head>
 <body>
+
   <div class="card">
-    <h2>Weight Tracker</h2>
-    <input type="number" id="height" placeholder="Height (cm)" />
-    <input type="number" id="weight" placeholder="Weight (kg)" />
-    <label><input type="checkbox" id="exercise" /> Did you exercise today?</label>
-    <button onclick="submitEntry()">Submit Entry</button>
-    <div id="log"></div>
+    <h2>My Weight Tracker</h2>
+
+    <label>Age</label>
+    <input type="number" id="age" placeholder="e.g. 15" />
+
+    <label>Height (cm)</label>
+    <input type="number" id="height" placeholder="e.g. 155" />
+
+    <label>Starting Weight (kg)</label>
+    <input type="number" id="startWeight" placeholder="e.g. 53" />
+
+    <label>Goal Weight (kg)</label>
+    <input type="number" id="goalWeight" placeholder="e.g. 48" />
+
+    <label>Activity Level</label>
+    <select id="activityLevel">
+      <option value="1.2">Low</option>
+      <option value="1.375" selected>Moderate</option>
+      <option value="1.55">High</option>
+    </select>
+
+    <hr/>
+
+    <label>Current Weight (kg)</label>
+    <input type="number" id="weight" />
+
+    <label><input type="checkbox" id="exercise" /> Exercised today</label>
+
+    <button onclick="addEntry()">Submit Entry</button>
   </div>
+
+  <div class="card">
+    <h3>Progress</h3>
+    <div class="progress">
+      <div id="progressBar" class="progress-bar">0%</div>
+    </div>
+    <p id="bmiDisplay"></p>
+    <p id="calorieInfo"></p>
+  </div>
+
+  <div class="card">
+    <canvas id="weightChart" height="200"></canvas>
+    <canvas id="bmiChart" height="200"></canvas>
+  </div>
+
+  <div class="card" id="log"><h3>Entry Log</h3></div>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js"></script>
@@ -26,51 +73,64 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js"></script>
 
   <script>
-    // TODO: Replace below with your own Firebase config
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "your-project.firebaseapp.com",
-      databaseURL: "https://your-project.firebaseio.com",
-      projectId: "your-project-id",
-      storageBucket: "your-project.appspot.com",
-      messagingSenderId: "your-sender-id",
-      appId: "your-app-id"
-    };
+    // 🛠 Replace with your Firebase config
+    const firebaseConfig = // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDCANiNTmv4bU7ayVyCD_Dwwf04QQ7XlVc",
+  authDomain: "weight-tracker-01.firebaseapp.com",
+  databaseURL: "https://weight-tracker-01-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "weight-tracker-01",
+  storageBucket: "weight-tracker-01.firebasestorage.app",
+  messagingSenderId: "560173087855",
+  appId: "1:560173087855:web:d6b591b55e6151ac7c619a",
+  measurementId: "G-E4MRDK2VZE"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
     const app = firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     const auth = firebase.auth();
 
     let uid = null;
+    let entries = [];
 
     auth.signInAnonymously().then(() => {
       uid = auth.currentUser.uid;
       loadEntries();
     });
 
-    function submitEntry() {
+    function addEntry() {
       const weight = parseFloat(document.getElementById("weight").value);
       const height = parseFloat(document.getElementById("height").value);
+      const age = parseInt(document.getElementById("age").value);
+      const startWeight = parseFloat(document.getElementById("startWeight").value);
+      const goalWeight = parseFloat(document.getElementById("goalWeight").value);
+      const activity = parseFloat(document.getElementById("activityLevel").value);
       const exercised = document.getElementById("exercise").checked;
 
-      if (!weight || !height) {
-        alert("Please enter weight and height!");
+      if (!weight || !height || !age || !startWeight || !goalWeight) {
+        alert("Please fill all fields.");
         return;
       }
 
       const bmi = (weight / ((height / 100) ** 2)).toFixed(1);
-      const entry = {
-        date: new Date().toISOString().split("T")[0],
-        weight,
-        height,
-        bmi,
-        exercised
-      };
+      const date = new Date().toISOString().split("T")[0];
+      const entry = { date, weight, bmi, height, exercised, age, startWeight, goalWeight, activity };
 
       db.ref("users/" + uid + "/entries").push(entry).then(() => {
-        loadEntries();
         document.getElementById("weight").value = "";
         document.getElementById("exercise").checked = false;
+        loadEntries();
       });
     }
 
@@ -78,21 +138,79 @@
       db.ref("users/" + uid + "/entries").once("value").then(snapshot => {
         const data = snapshot.val();
         const log = document.getElementById("log");
-        log.innerHTML = "<h3>Log:</h3>";
+        log.innerHTML = "<h3>Entry Log</h3>";
 
         if (!data) return;
 
-        Object.values(data).reverse().forEach(entry => {
+        entries = Object.values(data).sort((a, b) => new Date(a.date) - new Date(b.date));
+        entries.forEach(entry => {
           log.innerHTML += `
             <div class="entry">
               <strong>${entry.date}</strong><br/>
               Weight: ${entry.weight} kg<br/>
-              Height: ${entry.height} cm<br/>
               BMI: ${entry.bmi}<br/>
               Exercise: ${entry.exercised ? "✅" : "❌"}
-            </div>
-          `;
+            </div>`;
         });
+
+        renderCharts();
+        updateStats();
+      });
+    }
+
+    function updateStats() {
+      if (entries.length === 0) return;
+      const latest = entries[entries.length - 1];
+      const weight = latest.weight;
+      const height = latest.height;
+      const goal = latest.goalWeight;
+      const start = latest.startWeight;
+      const age = latest.age;
+      const activity = latest.activity;
+      const bmi = (weight / ((height / 100) ** 2)).toFixed(1);
+
+      document.getElementById("bmiDisplay").innerText = `Latest BMI: ${bmi}`;
+
+      const bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+      const tdee = Math.round(bmr * activity);
+      const deficit = tdee - 500;
+      document.getElementById("calorieInfo").innerText =
+        `To maintain: ${tdee} kcal/day — To lose: ~${deficit} kcal/day`;
+
+      const progressPercent = Math.min(100, ((start - weight) / (start - goal)) * 100).toFixed(1);
+      document.getElementById("progressBar").style.width = `${progressPercent}%`;
+      document.getElementById("progressBar").innerText = `${progressPercent}%`;
+    }
+
+    function renderCharts() {
+      const dates = entries.map(e => e.date);
+      const weights = entries.map(e => e.weight);
+      const bmis = entries.map(e => parseFloat(e.bmi));
+
+      new Chart(document.getElementById("weightChart"), {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: 'Weight (kg)',
+            data: weights,
+            borderColor: '#007bff',
+            fill: false
+          }]
+        }
+      });
+
+      new Chart(document.getElementById("bmiChart"), {
+        type: 'line',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: 'BMI',
+            data: bmis,
+            borderColor: '#ff6384',
+            fill: false
+          }]
+        }
       });
     }
   </script>
