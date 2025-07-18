@@ -5,185 +5,154 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Weight Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module">
+    // Firebase SDK imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, push, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDCANiNTmv4bU7ayVyCD_Dwwf04QQ7XlVc",
+      authDomain: "weight-tracker-01.firebaseapp.com",
+      databaseURL: "https://weight-tracker-01-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "weight-tracker-01",
+      storageBucket: "weight-tracker-01.appspot.com",
+      messagingSenderId: "560173087855",
+      appId: "1:560173087855:web:d6b591b55e6151ac7c619a",
+      measurementId: "G-E4MRDK2VZE"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let userProfile = JSON.parse(localStorage.getItem('userProfile')) || null;
+    const weightInput = document.getElementById("weight");
+    const profileSection = document.getElementById("profile");
+    const bmiDisplay = document.getElementById("bmi");
+    const burnDisplay = document.getElementById("burn");
+    const daysDisplay = document.getElementById("days");
+    const progressBar = document.getElementById("progress");
+    const chartCtx = document.getElementById("chart").getContext("2d");
+
+    let chart;
+
+    function calculateBMI(weight, height) {
+      return (weight / ((height / 100) ** 2)).toFixed(1);
+    }
+
+    function calculateCalories(weight, height, age) {
+      const bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+      return Math.round(bmr * 1.55);
+    }
+
+    function updateProgress(current, start, goal) {
+      const progress = Math.min(100, Math.max(0, ((start - current) / (start - goal)) * 100));
+      progressBar.style.width = `${progress}%`;
+      progressBar.innerText = `${Math.round(progress)}%`;
+    }
+
+    async function fetchData() {
+      const snap = await get(ref(db, "weights"));
+      if (snap.exists()) {
+        const data = Object.values(snap.val());
+        const labels = data.map(e => e.date);
+        const weights = data.map(e => e.weight);
+
+        if (weights.length > 0) {
+          const latest = weights[weights.length - 1];
+          weightInput.value = latest;
+          const bmi = calculateBMI(latest, userProfile.height);
+          bmiDisplay.innerText = `BMI: ${bmi}`;
+
+          const calories = calculateCalories(latest, userProfile.height, userProfile.age);
+          burnDisplay.innerText = `Est. burn to lose: ${calories - 500} kcal/day`;
+
+          const daysLeft = ((latest - userProfile.goal) * 7700) / 500;
+          daysDisplay.innerText = `Est. days to goal: ${Math.round(daysLeft)} days`;
+
+          updateProgress(latest, userProfile.start, userProfile.goal);
+
+          if (chart) chart.destroy();
+          chart = new Chart(chartCtx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Weight (kg)',
+                data: weights,
+                borderColor: 'blue',
+                fill: false
+              }]
+            }
+          });
+        }
+      }
+    }
+
+    document.getElementById("submit").onclick = async () => {
+      const val = parseFloat(weightInput.value);
+      if (!userProfile || isNaN(val)) return;
+      const entry = {
+        weight: val,
+        date: new Date().toISOString().split('T')[0]
+      };
+      const newRef = push(ref(db, "weights"));
+      await set(newRef, entry);
+      fetchData();
+    };
+
+    document.getElementById("saveProfile").onclick = () => {
+      const age = parseInt(document.getElementById("age").value);
+      const height = parseInt(document.getElementById("height").value);
+      const start = parseFloat(document.getElementById("start").value);
+      const goal = parseFloat(document.getElementById("goal").value);
+      if (isNaN(age) || isNaN(height) || isNaN(start) || isNaN(goal)) return;
+
+      userProfile = { age, height, start, goal };
+      localStorage.setItem("userProfile", JSON.stringify(userProfile));
+      document.getElementById("setup").style.display = "none";
+      profileSection.style.display = "block";
+      fetchData();
+    };
+
+    window.onload = () => {
+      if (!userProfile) {
+        document.getElementById("setup").style.display = "block";
+        profileSection.style.display = "none";
+      } else {
+        document.getElementById("setup").style.display = "none";
+        profileSection.style.display = "block";
+        fetchData();
+      }
+    };
+  </script>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 2rem;
-      background: var(--bg);
-      color: var(--text);
-      transition: background 0.3s, color 0.3s;
-    }
-    :root {
-      --bg: #ffffff;
-      --text: #000000;
-    }
-    .dark-mode {
-      --bg: #121212;
-      --text: #f1f1f1;
-    }
-    input, button {
-      padding: 0.5rem;
-      margin: 0.5rem 0;
-    }
-    .container {
-      max-width: 500px;
-      margin: auto;
-    }
-    .progress-bar {
-      background: #ddd;
-      border-radius: 10px;
-      overflow: hidden;
-      height: 20px;
-      margin-bottom: 1rem;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: #4caf50;
-      width: 0%;
-      transition: width 0.3s;
-    }
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    .bar { height: 25px; background: #ccc; border-radius: 20px; overflow: hidden; margin: 10px 0; }
+    #progress { height: 100%; background: green; text-align: center; color: white; line-height: 25px; }
+    input { display: block; margin: 5px 0; width: 100%; padding: 5px; }
+    button { margin: 10px 0; padding: 10px; width: 100%; }
   </style>
 </head>
 <body>
-<div class="container">
-  <button onclick="toggleMode()">Toggle Light/Dark</button>
   <h1>Weight Tracker</h1>
-  <div id="inputForm">
-    <label>Age: <input type="number" id="age" /></label><br />
-    <label>Height (cm): <input type="number" id="height" /></label><br />
-    <label>Start Weight (kg): <input type="number" id="startWeight" /></label><br />
-    <label>Goal Weight (kg): <input type="number" id="goalWeight" /></label><br />
-    <button onclick="initializeUser()">Start Tracking</button>
+
+  <div id="setup" style="display:none">
+    <input type="number" id="age" placeholder="Age" />
+    <input type="number" id="height" placeholder="Height (cm)" />
+    <input type="number" id="start" placeholder="Starting weight (kg)" />
+    <input type="number" id="goal" placeholder="Goal weight (kg)" />
+    <button id="saveProfile">Save Profile</button>
   </div>
 
-  <div id="tracker" style="display:none">
-    <label>Latest Weight (kg): <input type="number" id="latestWeight" /></label>
-    <button onclick="submitWeight()">Submit</button>
+  <div id="profile" style="display:none">
+    <input type="number" id="weight" placeholder="Enter weight (kg)" />
+    <button id="submit">Submit</button>
 
-    <canvas id="weightChart" width="400" height="200"></canvas>
-    <div class="progress-bar"><div id="progressFill" class="progress-bar-fill"></div></div>
-
-    <p><strong>Progress:</strong> <span id="progressText">0%</span></p>
-    <p><strong>BMI:</strong> <span id="bmi"></span></p>
-    <p><strong>Calories/day (TDEE):</strong> <span id="tdee"></span> kcal</p>
-    <p><strong>Est. Burn Needed:</strong> 500 kcal/day</p>
-    <p><strong>Est. Days to Goal:</strong> <span id="estDays"></span></p>
-    <p><strong>Recommended Sleep:</strong> 8–10 hours</p>
-    <p id="motivation"></p>
+    <div class="bar"><div id="progress">0%</div></div>
+    <p id="bmi">BMI: -</p>
+    <p id="burn">Est. burn to lose: -</p>
+    <p id="days">Est. days to goal: -</p>
+    <canvas id="chart" height="200"></canvas>
   </div>
-</div>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, push, onValue, set, get, child } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyDCANiNTmv4bU7ayVyCD_Dwwf04QQ7XlVc",
-    authDomain: "weight-tracker-01.firebaseapp.com",
-    databaseURL: "https://weight-tracker-01-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "weight-tracker-01",
-    storageBucket: "weight-tracker-01.appspot.com",
-    messagingSenderId: "560173087855",
-    appId: "1:560173087855:web:d6b591b55e6151ac7c619a",
-    measurementId: "G-E4MRDK2VZE"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
-  let userInfo = {};
-  let weights = [];
-  let chart;
-
-  function toggleMode() {
-    document.body.classList.toggle('dark-mode');
-  }
-
-  function initializeUser() {
-    userInfo.age = parseInt(document.getElementById('age').value);
-    userInfo.height = parseFloat(document.getElementById('height').value);
-    userInfo.startWeight = parseFloat(document.getElementById('startWeight').value);
-    userInfo.goalWeight = parseFloat(document.getElementById('goalWeight').value);
-
-    if (!userInfo.age || !userInfo.height || !userInfo.startWeight || !userInfo.goalWeight) return alert("Fill all fields");
-
-    set(ref(db, 'userInfo'), userInfo);
-    document.getElementById('inputForm').style.display = 'none';
-    document.getElementById('tracker').style.display = 'block';
-
-    renderChart();
-    updateMetrics(userInfo.startWeight);
-    loadMotivation();
-  }
-
-  function submitWeight() {
-    const latest = parseFloat(document.getElementById('latestWeight').value);
-    if (!latest || !userInfo.height || !userInfo.age) return alert("Missing data");
-
-    const weightRef = push(ref(db, 'weights'));
-    set(weightRef, { value: latest, time: Date.now() });
-
-    weights.push(latest);
-    updateChart();
-    updateMetrics(latest);
-  }
-
-  function renderChart() {
-    const ctx = document.getElementById('weightChart').getContext('2d');
-    chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [{
-          label: 'Weight (kg)',
-          data: [],
-          borderColor: '#4caf50',
-          tension: 0.3
-        }]
-      }
-    });
-  }
-
-  function updateChart() {
-    chart.data.labels = weights.map((_, i) => `Day ${i + 1}`);
-    chart.data.datasets[0].data = weights;
-    chart.update();
-  }
-
-  function updateMetrics(currentWeight) {
-    const h = userInfo.height / 100;
-    const bmi = currentWeight / (h * h);
-    document.getElementById('bmi').textContent = bmi.toFixed(1);
-
-    const bmr = 10 * currentWeight + 6.25 * userInfo.height - 5 * userInfo.age + 5;
-    const tdee = bmr * 1.55;
-    document.getElementById('tdee').textContent = Math.round(tdee);
-
-    const progress = ((userInfo.startWeight - currentWeight) / (userInfo.startWeight - userInfo.goalWeight)) * 100;
-    const progressText = Math.min(Math.max(progress, 0), 100).toFixed(0);
-    document.getElementById('progressText').textContent = `${progressText}%`;
-    document.getElementById('progressFill').style.width = `${progressText}%`;
-
-    const estDays = (currentWeight - userInfo.goalWeight) / 0.5;
-    document.getElementById('estDays').textContent = estDays > 0 ? Math.ceil(estDays) + ' days' : 'Goal reached';
-  }
-
-  function loadMotivation() {
-    const quotes = [
-      "Progress, not perfection.",
-      "You don’t have to be extreme, just consistent.",
-      "Push yourself because no one else is going to do it.",
-      "The body achieves what the mind believes.",
-      "Discipline is choosing between what you want now and what you want most.",
-      "It’s never too late to be what you might have been.",
-      "Small steps every day.",
-      "You are your only limit.",
-      "Strive for progress, not perfection.",
-      "Fall seven times, stand up eight."
-    ];
-    const quote = quotes[Math.floor(Math.random() * quotes.length)];
-    document.getElementById('motivation').textContent = `💬 ${quote}`;
-  }
-</script>
 </body>
 </html>
