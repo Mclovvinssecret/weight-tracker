@@ -2,14 +2,50 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Weight Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: auto;
+      padding: 1em;
+    }
+    .progress-container {
+      background: #ddd;
+      border-radius: 20px;
+      overflow: hidden;
+      margin-top: 1em;
+    }
+    .progress-bar {
+      background: #4caf50;
+      height: 24px;
+      text-align: center;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Weight Tracker</h1>
+  <form id="weightForm">
+    <input type="number" id="weight" placeholder="Enter weight in kg" required />
+    <button type="submit">Submit</button>
+  </form>
+  <canvas id="weightChart" width="400" height="200"></canvas>
+
+  <div class="progress-container">
+    <div id="progressBar" class="progress-bar">0%</div>
+  </div>
+
+  <p id="bmi"></p>
+  <p id="calories"></p>
+  <p id="days"></p>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyDCANiNTmv4bU7ayVyCD_Dwwf04QQ7XlVc",
       authDomain: "weight-tracker-01.firebaseapp.com",
@@ -31,7 +67,7 @@
       goalWeight: 48
     };
 
-    document.addEventListener("DOMContentLoaded", () => {
+    window.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("weightForm");
       const weightInput = document.getElementById("weight");
       const chartCtx = document.getElementById("weightChart").getContext("2d");
@@ -47,7 +83,7 @@
             label: 'Weight (kg)',
             data: [],
             borderColor: 'blue',
-            tension: 0.1
+            tension: 0.2
           }]
         },
         options: {
@@ -65,9 +101,8 @@
       }
 
       function updateProgress(latestWeight) {
-        const start = userInfo.startWeight;
-        const goal = userInfo.goalWeight;
-        const progress = ((start - latestWeight) / (start - goal)) * 100;
+        const { startWeight, goalWeight } = userInfo;
+        const progress = ((startWeight - latestWeight) / (startWeight - goalWeight)) * 100;
         const clamped = Math.max(0, Math.min(progress, 100));
         progressBar.style.width = clamped + "%";
         progressBar.innerText = clamped.toFixed(1) + "%";
@@ -85,7 +120,6 @@
         document.getElementById("days").innerText = `Est. days to goal: ${daysToGoal}`;
       }
 
-      // Load existing data
       const refDb = ref(db, "weights/");
       onValue(refDb, snapshot => {
         weightData = [];
@@ -101,65 +135,27 @@
         }
       });
 
-      // Submit handler
       form.addEventListener("submit", (e) => {
         e.preventDefault();
         const weight = parseFloat(weightInput.value);
         if (!isNaN(weight)) {
+          const today = new Date().toISOString().split("T")[0];
           const newRef = push(ref(db, "weights/"));
           newRef.set({
-            date: new Date().toISOString().split("T")[0],
+            date: today,
             weight: weight
+          }).then(() => {
+            console.log("Data saved!");
+            weightInput.value = "";
+          }).catch((error) => {
+            alert("Error saving weight: " + error.message);
+            console.error(error);
           });
-          weightInput.value = "";
+        } else {
+          alert("Please enter a valid weight");
         }
       });
     });
   </script>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 1em;
-      max-width: 500px;
-      margin: auto;
-    }
-    .bar {
-      width: 100%;
-      background: #eee;
-      height: 30px;
-      border-radius: 15px;
-      overflow: hidden;
-      margin-top: 1em;
-    }
-    .fill {
-      height: 100%;
-      background: limegreen;
-      text-align: center;
-      color: white;
-      font-weight: bold;
-      line-height: 30px;
-    }
-    canvas {
-      max-width: 100%;
-    }
-  </style>
-</head>
-<body>
-  <h2>🏃‍♂️ Weight Tracker</h2>
-
-  <form id="weightForm">
-    <input type="number" id="weight" step="0.1" placeholder="Enter today's weight (kg)" required />
-    <button type="submit">Submit</button>
-  </form>
-
-  <div class="bar">
-    <div id="progressBar" class="fill">0%</div>
-  </div>
-
-  <p id="bmi">BMI: -</p>
-  <p id="calories">Est. burn to lose: -</p>
-  <p id="days">Est. days to goal: -</p>
-
-  <canvas id="weightChart" height="100"></canvas>
 </body>
 </html>
