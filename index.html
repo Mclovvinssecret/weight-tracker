@@ -227,64 +227,67 @@
       renderChart(weights);
     }
 
-    function updateUI(weight) {
-      const progress = Math.max(0, Math.min(1, (startWeight - weight) / (startWeight - goalWeight)));
-      progressSpan.textContent = `${(progress * 100).toFixed(1)}%`;
-      progressBar.style.width = `${progress * 100}%`;
+function updateUI(weight) {
+  const progress = Math.max(0, Math.min(1, (startWeight - weight) / (startWeight - goalWeight)));
+  progressSpan.textContent = `${(progress * 100).toFixed(1)}%`;
+  progressBar.style.width = `${progress * 100}%`;
 
-      startWeightSpan.innerText = `${startWeight} kg`;
+  startWeightSpan.innerText = `${startWeight} kg`;
 
-      const bmi = (weight / ((height / 100) ** 2)).toFixed(1);
-      bmiSpan.innerText = bmi;
+  const bmi = (weight / ((height / 100) ** 2)).toFixed(1);
+  bmiSpan.innerText = bmi;
 
-      const BMR = Math.round(10 * weight + 6.25 * height - 5 * age + 5);
-const caloriesToBurn = 650;
-const activityFactor = 1.5;
-const TDEE = Math.round(BMR * activityFactor);
-const dailyDeficit = 650;
-const dailyIntake = TDEE - dailyDeficit;
+  const BMR = Math.round(10 * weight + 6.25 * height - 5 * age + 5);
+  const caloriesToBurn = 650;
+  const activityFactor = 1.5;
+  const TDEE = Math.round(BMR * activityFactor);
+  const dailyDeficit = 650;
+  const dailyIntake = TDEE - dailyDeficit;
 
-    // ✅ Date-formatted chart rendering
-    function renderChart(data) {
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          datasets: [{
-            label: 'Weight (kg)',
-            data: data.map(e => ({ x: e.date, y: e.weight })),
-            borderColor: '#4caf50',
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            x: {
-              type: 'time',
-              time: {
-                unit: 'day',
-                tooltipFormat: 'PP',
-                displayFormats: {
-                  day: 'MMM d'
-                }
-              },
-              title: {
-                display: true,
-                text: 'Date'
-              }
-            },
-            y: {
-              beginAtZero: false,
-              title: {
-                display: true,
-                text: 'Weight (kg)'
-              }
+  caloriesSpan.innerText = `${dailyDeficit} kcal/day`;
+}
+
+// ⬇️ OUTSIDE updateUI
+function renderChart(data) {
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Weight (kg)',
+        data: data.map(e => ({ x: e.date, y: e.weight })),
+        borderColor: '#4caf50',
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            unit: 'day',
+            tooltipFormat: 'PP',
+            displayFormats: {
+              day: 'MMM d'
             }
+          },
+          title: {
+            display: true,
+            text: 'Date'
+          }
+        },
+        y: {
+          beginAtZero: false,
+          title: {
+            display: true,
+            text: 'Weight (kg)'
           }
         }
-      });
+      }
     }
+  });
+}
 
     document.getElementById("submit").onclick = async () => {
       const val = parseFloat(weightInput.value);
