@@ -4,30 +4,59 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Weight Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fff;
+      --text: #000;
+    }
+    [data-theme="dark"] {
+      --bg: #121212;
+      --text: #f0f0f0;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 2rem;
+    }
+    .card {
+      background: rgba(0, 0, 0, 0.03);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 10px;
+    }
+    input, button {
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+    }
+    .toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      cursor: pointer;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-white">
-  <div class="max-w-xl mx-auto py-10 px-4">
-    <h1 class="text-3xl font-bold mb-6 text-center">Weight Tracker</h1><div class="mb-4">
-  <input id="weightInput" type="number" placeholder="Enter weight (kg)" class="w-full p-2 border rounded" />
-  <button id="submitWeight" class="mt-2 w-full p-2 bg-blue-500 text-white rounded hover:bg-blue-600">Submit</button>
-</div>
-
-<canvas id="weightChart" class="mb-6"></canvas>
-
-<div class="w-full bg-gray-300 rounded-full h-4 mb-2">
-  <div id="progressBar" class="bg-green-500 h-4 rounded-full" style="width: 0%"></div>
-</div>
-<div id="progressText" class="text-center mb-2">0%</div>
-
-<div id="bmiText" class="mb-1">BMI: -</div>
-<div id="tdeeText" class="mb-1">Calories allowed/day: -</div>
-<div id="burnText" class="mb-1">Est. burn to lose: -</div>
-<div id="estDaysText" class="mb-1">Est. days to goal: -</div>
-
-  </div>  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+<body>
+  <div class="toggle">
+    <button id="toggleTheme">🌓</button>
+  </div>  <h1>Weight Tracker</h1>
+  <div class="card">
+    <input type="number" id="weightInput" placeholder="Enter current weight (kg)" />
+    <button onclick="submitWeight()">Submit</button>
+  </div>  <div class="card">
+    <canvas id="weightChart" height="100"></canvas>
+  </div>  <div class="card">
+    <div>Progress: <span id="progress">0%</span></div>
+    <div>BMI: <span id="bmi">-</span></div>
+    <div>Calories/day (TDEE): <span id="tdee">-</span></div>
+    <div>Est. Burn Needed: <span id="burn">-</span></div>
+    <div>Est. Days to Goal: <span id="days">-</span></div>
+    <div>Recommended Sleep: 8–10 hours</div>
+  </div>  <div class="card" id="motivation"></div>  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDCANiNTmv4bU7ayVyCD_Dwwf04QQ7XlVc",
@@ -42,96 +71,80 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const weightRef = ref(db, 'weights');
 
-    const weightInput = document.getElementById("weightInput");
-    const submitBtn = document.getElementById("submitWeight");
-    const bmiText = document.getElementById("bmiText");
-    const tdeeText = document.getElementById("tdeeText");
-    const burnText = document.getElementById("burnText");
-    const estDaysText = document.getElementById("estDaysText");
+    const target = 48;
+    const start = 53;
+    const height = 1.55; // meters
+    const age = 15;
 
-    let profile = {
-      age: 15,
-      height: 155,
-      startWeight: 53,
-      goalWeight: 48,
-      gender: "male",
-      activity: "moderate"
-    };
+    let chart;
+    let weightData = [];
+    let labels = [];
 
-    function updateCalculations(latestWeight) {
-      const heightM = profile.height / 100;
-      const bmi = (latestWeight / (heightM * heightM)).toFixed(1);
-      bmiText.textContent = `BMI: ${bmi}`;
-
-      const bmr = profile.gender === "male"
-        ? 10 * latestWeight + 6.25 * profile.height - 5 * profile.age + 5
-        : 10 * latestWeight + 6.25 * profile.height - 5 * profile.age - 161;
-
-      const activityFactor = {
-        sedentary: 1.2,
-        light: 1.375,
-        moderate: 1.55,
-        active: 1.725
-      };
-
-      const tdee = Math.round(bmr * activityFactor[profile.activity]);
-      tdeeText.textContent = `Calories allowed/day: ${tdee}`;
-      burnText.textContent = `Est. burn to lose: ~500 cal/day`;
-
-      const totalFatToLose = profile.startWeight - profile.goalWeight;
-      const daysToGoal = Math.ceil((latestWeight - profile.goalWeight) / 0.5 * 7);
-      estDaysText.textContent = `Est. days to goal: ${Math.max(daysToGoal, 0)}`;
-    }
-
-    function updateChartAndProgress(data) {
-      const weights = Object.entries(data).sort((a, b) => a[0] - b[0]);
-      const labels = weights.map((_, i) => `Entry ${i + 1}`);
-      const values = weights.map(w => w[1]);
-
-      if (window.myChart) window.myChart.destroy();
-      window.myChart = new Chart(document.getElementById("weightChart"), {
-        type: "line",
+    function updateChart() {
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById('weightChart'), {
+        type: 'line',
         data: {
           labels,
           datasets: [{
-            label: "Weight (kg)",
-            data: values,
-            borderColor: "dodgerblue",
+            label: 'Weight (kg)',
+            data: weightData,
+            borderColor: '#007bff',
             fill: false
           }]
-        },
-        options: { responsive: true }
-      });
-
-      const latestWeight = values[values.length - 1];
-      const progress = Math.min(
-        100,
-        Math.max(0, ((profile.startWeight - latestWeight) / (profile.startWeight - profile.goalWeight)) * 100)
-      );
-      document.getElementById("progressBar").style.width = `${progress}%`;
-      document.getElementById("progressText").textContent = `${progress.toFixed(1)}%`;
-
-      updateCalculations(latestWeight);
-    }
-
-    function loadData() {
-      get(child(ref(db), "weights")).then(snapshot => {
-        if (snapshot.exists()) {
-          updateChartAndProgress(snapshot.val());
         }
       });
     }
 
-    submitBtn.onclick = () => {
-      const weight = parseFloat(weightInput.value);
-      if (!weight || weight <= 30 || weight > 300) return alert("Please enter valid weight.");
-      const now = Date.now();
-      set(ref(db, "weights/" + now), weight).then(loadData);
+    onValue(weightRef, snapshot => {
+      const val = snapshot.val();
+      if (!val) return;
+      weightData = Object.values(val).map(e => e.weight);
+      labels = Object.values(val).map((_, i) => `Day ${i + 1}`);
+      updateChart();
+      const latest = weightData[weightData.length - 1];
+      const bmi = (latest / (height * height)).toFixed(1);
+      const bmr = 10 * latest + 6.25 * (height * 100) - 5 * age + 5;
+      const tdee = Math.round(bmr * 1.55);
+      const toLose = Math.max(latest - target, 0);
+      const daysToGoal = Math.ceil((toLose * 7700) / 500);
+      const progress = Math.round(((start - latest) / (start - target)) * 100);
+
+      document.getElementById('bmi').textContent = bmi;
+      document.getElementById('tdee').textContent = tdee + ' kcal';
+      document.getElementById('burn').textContent = '500 kcal/day';
+      document.getElementById('days').textContent = daysToGoal;
+      document.getElementById('progress').textContent = progress + '%';
+    });
+
+    window.submitWeight = () => {
+      const weight = parseFloat(document.getElementById('weightInput').value);
+      if (!weight) return;
+      push(weightRef, { weight });
     };
 
-    window.onload = () => {
-      loadData();
+    const quotes = [
+      "Progress, not perfection.",
+      "One day at a time.",
+      "Discipline over motivation.",
+      "Small steps lead to big changes.",
+      "Stay consistent, stay committed.",
+      "Your only competition is yourself.",
+      "You are stronger than you think."
+    ];
+    document.getElementById('motivation').textContent = '💬 ' + quotes[Math.floor(Math.random() * quotes.length)];
+
+    const themeToggle = document.getElementById('toggleTheme');
+    const setTheme = (mode) => {
+      document.documentElement.setAttribute('data-theme', mode);
+      localStorage.setItem('theme', mode);
     };
+    themeToggle.onclick = () => {
+      const current = localStorage.getItem('theme') === 'dark' ? 'light' : 'dark';
+      setTheme(current);
+    };
+    setTheme(localStorage.getItem('theme') || 'light');
   </script></body>
 </html>
